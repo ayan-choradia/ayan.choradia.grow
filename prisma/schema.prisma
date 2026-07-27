@@ -1,0 +1,61 @@
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model TradingPlan {
+  id               String           @id @default(cuid())
+  date             DateTime         @unique
+  dayOfWeek        String           // e.g. "Monday"
+  marketBias       String           // "BULLISH" | "BEARISH" | "NEUTRAL" | "VOLATILE"
+  emotionState     String           // "DISCIPLINED" | "CALM" | "FOCUSED" | "PATIENT" | "ANXIOUS" | "FOMO_RISK"
+  supportLevels    String?
+  resistanceLevels String?
+  vwapTarget       String?
+  catalysts        String?
+  rulesCommitment  String?
+  planNotes        String?
+  createdAt        DateTime         @default(now())
+  updatedAt        DateTime         @updatedAt
+  executions       TradeExecution[]
+}
+
+model TradeExecution {
+  id            String       @id @default(cuid())
+  planId        String?
+  plan          TradingPlan? @relation(fields: [planId], references: [id])
+  date          DateTime
+  symbol        String       // e.g. "NIFTY", "BANKNIFTY", "SPY", "QQQ", "BTCUSD"
+  side          String       // "LONG" | "SHORT"
+  entryPrice    Float
+  exitPrice     Float?
+  stopLoss      Float
+  takeProfit    Float
+  quantity      Float        @default(1)
+  pnl           Float?
+  rMultiple     Float?
+  strategy      String       // e.g. "Breakout", "Mean Reversion", "VWAP Rejection", "Liquidity Sweep"
+  notes         String?
+  chartUrl      String?
+  status        String       @default("CLOSED") // "OPEN" | "CLOSED"
+  followedEntry Boolean      @default(true)
+  followedStop  Boolean      @default(true)
+  followedRisk  Boolean      @default(true)
+  ruleScore     Float        @default(100)
+  createdAt     DateTime     @default(now())
+}
+
+model DailyReflection {
+  id                 String   @id @default(cuid())
+  date               DateTime @unique
+  whatWentWell       String?
+  mistakesMade       String?
+  keyLearnings       String?
+  overallRating      Int      @default(5)
+  ruleAdherenceScore Float    @default(100)
+  createdAt          DateTime @default(now())
+}
