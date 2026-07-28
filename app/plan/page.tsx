@@ -12,18 +12,20 @@ import {
   ChevronLeft,
   ChevronRight,
   TrendingUp,
-  Sparkles
+  Sparkles,
+  MessageSquareText
 } from 'lucide-react';
 import { getTodayOrNextTradingDay, formatDateForInput, formatDateDisplay, isTradingDay } from '@/lib/date-utils';
 import { addDays, parseISO } from 'date-fns';
+import ImagePasteInput from '@/components/ImagePasteInput';
 
 const EMOTIONAL_STATES = [
-  { id: 'DISCIPLINED', label: 'Disciplined', color: 'emerald', desc: '100% adherence to system rules. Execution ready.' },
-  { id: 'CALM', label: 'Calm & Objective', color: 'cyan', desc: 'Emotionally detached from outcomes. Clear focus.' },
-  { id: 'FOCUSED', label: 'Sharply Focused', color: 'blue', desc: 'Flow state. Fully tuned into market price action.' },
-  { id: 'PATIENT', label: 'Patient Stalker', color: 'teal', desc: 'Waiting strictly for key levels and setup triggers.' },
-  { id: 'ANXIOUS', label: 'Anxious / Hesitant', color: 'amber', desc: 'Warning: Reduce position size by 50% today.' },
-  { id: 'FOMO_RISK', label: 'FOMO / Impatience', color: 'rose', desc: 'CAUTION: High risk of impulse trades. Take a breath.' },
+  { id: 'DISCIPLINED', label: 'Disciplined', desc: '100% adherence to system rules. Execution ready.' },
+  { id: 'CALM', label: 'Calm & Objective', desc: 'Emotionally detached from outcomes. Clear focus.' },
+  { id: 'FOCUSED', label: 'Sharply Focused', desc: 'Flow state. Fully tuned into market price action.' },
+  { id: 'PATIENT', label: 'Patient Stalker', desc: 'Waiting strictly for key levels and setup triggers.' },
+  { id: 'ANXIOUS', label: 'Anxious / Hesitant', desc: 'Warning: Reduce position size by 50% today.' },
+  { id: 'FOMO_RISK', label: 'FOMO / Impatience', desc: 'CAUTION: High risk of impulse trades. Take a breath.' },
 ];
 
 export default function TradingPlanPage() {
@@ -31,14 +33,15 @@ export default function TradingPlanPage() {
   const [dayOfWeek, setDayOfWeek] = useState<string>('');
   const [marketBias, setMarketBias] = useState<string>('BULLISH');
   const [emotionState, setEmotionState] = useState<string>('DISCIPLINED');
+  const [planNotes, setPlanNotes] = useState<string>('');
+  const [chartImage, setChartImage] = useState<string>('');
   const [supportLevels, setSupportLevels] = useState<string>('');
   const [resistanceLevels, setResistanceLevels] = useState<string>('');
   const [vwapTarget, setVwapTarget] = useState<string>('');
   const [catalysts, setCatalysts] = useState<string>('');
   const [rulesCommitment, setRulesCommitment] = useState<string>(
-    '1. Max 2 trades today.\n2. Minimum 1:2 R:R required.\n3. Hard Stop-Loss entered into terminal before entry.'
+    '1. Max 2 trades per session.\n2. Minimum 1:2 R:R required.\n3. Hard Stop-Loss entered into terminal before entry.'
   );
-  const [planNotes, setPlanNotes] = useState<string>('');
 
   const [saving, setSaving] = useState(false);
   const [savedSuccess, setSavedSuccess] = useState(false);
@@ -60,12 +63,13 @@ export default function TradingPlanPage() {
         const data = json.data;
         setMarketBias(data.marketBias || 'BULLISH');
         setEmotionState(data.emotionState || 'DISCIPLINED');
+        setPlanNotes(data.planNotes || '');
+        setChartImage(data.chartImage || '');
         setSupportLevels(data.supportLevels || '');
         setResistanceLevels(data.resistanceLevels || '');
         setVwapTarget(data.vwapTarget || '');
         setCatalysts(data.catalysts || '');
-        setRulesCommitment(data.rulesCommitment || '1. Max 2 trades today.\n2. Minimum 1:2 R:R required.\n3. Hard Stop-Loss entered into terminal before entry.');
-        setPlanNotes(data.planNotes || '');
+        setRulesCommitment(data.rulesCommitment || '1. Max 2 trades per session.\n2. Minimum 1:2 R:R required.\n3. Hard Stop-Loss entered into terminal before entry.');
       }
     } catch (err) {
       console.error('Failed to fetch plan:', err);
@@ -115,6 +119,7 @@ export default function TradingPlanPage() {
           catalysts,
           rulesCommitment,
           planNotes,
+          chartImage,
         }),
       });
 
@@ -139,11 +144,11 @@ export default function TradingPlanPage() {
         <div>
           <div className="flex items-center gap-2">
             <span className="rounded bg-emerald-500/10 px-2 py-0.5 font-mono text-xs font-semibold text-emerald-400 border border-emerald-500/20">
-              PRE-MARKET PROTOCOL
+              DAILY PRE-MARKET PLAN
             </span>
-            <span className="text-xs text-slate-400 font-mono">Weekends & Holidays Auto-Skipped</span>
+            <span className="text-xs text-slate-400 font-mono">Weekends (Sat/Sun) & Holidays Auto-Skipped</span>
           </div>
-          <h1 className="text-3xl font-extrabold text-white mt-1">Pre-Market Trading Plan</h1>
+          <h1 className="text-3xl font-extrabold text-white mt-1">Today's Market View & Trading Plan</h1>
         </div>
 
         {/* Date Selector Navigation */}
@@ -179,27 +184,54 @@ export default function TradingPlanPage() {
       </div>
 
       <form onSubmit={handleSavePlan} className="space-y-8">
-        {/* Section 1: Market Bias & Live Emotion Check */}
+        {/* Section 1: Today's View Upon the Market */}
+        <div className="rounded-2xl border border-slate-800 bg-slate-900/60 p-6 space-y-4 shadow-lg">
+          <div className="flex items-center gap-2 border-b border-slate-800 pb-3">
+            <MessageSquareText className="h-5 w-5 text-emerald-400" />
+            <h2 className="text-lg font-bold text-slate-100">1. What is your Today's View upon the Market?</h2>
+          </div>
+
+          <div className="space-y-4">
+            <textarea
+              rows={4}
+              value={planNotes}
+              onChange={(e) => setPlanNotes(e.target.value)}
+              placeholder="Write your market thesis for today (e.g. Higher timeframe market structure, expected trend direction, liquidity sweeps, key levels to watch, risk events)..."
+              className="w-full rounded-xl bg-slate-950 border border-slate-800 p-4 text-xs font-mono text-slate-100 focus:border-emerald-500 focus:outline-none leading-relaxed"
+              required
+            />
+
+            {/* Paste Chart Screenshot Component */}
+            <ImagePasteInput
+              value={chartImage}
+              onChange={setChartImage}
+              label="Pre-Market Chart Screenshot (Ctrl+V to Paste Screenshot)"
+              placeholder="Click here and press Ctrl+V to paste chart screenshot from TradingView / terminal, or drag & drop image"
+            />
+          </div>
+        </div>
+
+        {/* Section 2: Market Bias & Live Emotion Check */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           {/* Market Bias Selector */}
           <div className="rounded-2xl border border-slate-800 bg-slate-900/60 p-6 space-y-4 shadow-lg">
             <div className="flex items-center gap-2">
               <TrendingUp className="h-5 w-5 text-emerald-400" />
-              <h2 className="text-lg font-bold text-slate-100">1. Today's Market Bias & Outlook</h2>
+              <h2 className="text-lg font-bold text-slate-100">2. Market Directional Bias</h2>
             </div>
 
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
               {[
-                { id: 'BULLISH', label: 'BULLISH', color: 'emerald' },
-                { id: 'BEARISH', label: 'BEARISH', color: 'rose' },
-                { id: 'NEUTRAL', label: 'NEUTRAL', color: 'cyan' },
-                { id: 'VOLATILE', label: 'RANGE / VOL', color: 'amber' },
+                { id: 'BULLISH', label: 'BULLISH' },
+                { id: 'BEARISH', label: 'BEARISH' },
+                { id: 'NEUTRAL', label: 'NEUTRAL' },
+                { id: 'VOLATILE', label: 'RANGE / VOL' },
               ].map(b => (
                 <button
                   key={b.id}
                   type="button"
                   onClick={() => setMarketBias(b.id)}
-                  className={`py-3 px-2 rounded-xl font-mono text-xs font-bold transition-all border text-center ${
+                  className={`py-3 px-2 rounded-xl font-mono text-xs font-bold transition-all border text-center cursor-pointer ${
                     marketBias === b.id
                       ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/50 shadow-md'
                       : 'bg-slate-950/70 text-slate-400 border-slate-800 hover:border-slate-700 hover:text-slate-200'
@@ -209,17 +241,13 @@ export default function TradingPlanPage() {
                 </button>
               ))}
             </div>
-            
-            <div className="text-xs text-slate-400 font-mono bg-slate-950/60 p-3 rounded-xl border border-slate-800/80">
-              Current Active Bias: <span className="font-bold text-emerald-400">{marketBias}</span>
-            </div>
           </div>
 
-          {/* Emotional & Psychology Audit */}
+          {/* Emotional State Check */}
           <div className="rounded-2xl border border-slate-800 bg-slate-900/60 p-6 space-y-4 shadow-lg">
             <div className="flex items-center gap-2">
               <Brain className="h-5 w-5 text-cyan-400" />
-              <h2 className="text-lg font-bold text-slate-100">2. Live Pre-Market Emotion Meter</h2>
+              <h2 className="text-lg font-bold text-slate-100">3. Live Market Emotions & State</h2>
             </div>
 
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
@@ -228,7 +256,7 @@ export default function TradingPlanPage() {
                   key={st.id}
                   type="button"
                   onClick={() => setEmotionState(st.id)}
-                  className={`py-2 px-3 rounded-xl font-mono text-xs font-semibold text-left transition-all border ${
+                  className={`py-2 px-3 rounded-xl font-mono text-xs font-semibold text-left transition-all border cursor-pointer ${
                     emotionState === st.id
                       ? 'bg-cyan-500/20 text-cyan-300 border-cyan-500/50 shadow-md'
                       : 'bg-slate-950/70 text-slate-400 border-slate-800 hover:border-slate-700 hover:text-slate-200'
@@ -239,7 +267,7 @@ export default function TradingPlanPage() {
               ))}
             </div>
 
-            {/* Dynamic Psychology Advice Box */}
+            {/* Dynamic Advice Box */}
             <div className={`p-4 rounded-xl border text-xs space-y-1 ${
               currentEmotion.id === 'FOMO_RISK' || currentEmotion.id === 'ANXIOUS'
                 ? 'bg-rose-950/30 border-rose-800/50 text-rose-300'
@@ -254,88 +282,64 @@ export default function TradingPlanPage() {
           </div>
         </div>
 
-        {/* Section 2: Technical Levels & Macro Catalysts */}
-        <div className="rounded-2xl border border-slate-800 bg-slate-900/60 p-6 space-y-6 shadow-lg">
-          <div className="flex items-center gap-2 border-b border-slate-800 pb-4">
-            <Target className="h-5 w-5 text-emerald-400" />
-            <h2 className="text-lg font-bold text-slate-100">3. Technical Levels & Macro News Catalysts</h2>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div className="space-y-2">
-              <label className="text-xs font-mono font-semibold text-slate-300 block">KEY SUPPORT LEVELS</label>
-              <input
-                type="text"
-                value={supportLevels}
-                onChange={(e) => setSupportLevels(e.target.value)}
-                placeholder="e.g. NIFTY 24,450 / SPY 548.50"
-                className="w-full rounded-xl bg-slate-950 border border-slate-800 px-4 py-3 text-xs font-mono text-slate-100 focus:border-emerald-500 focus:outline-none"
-              />
-            </div>
-
-            <div className="space-y-2">
-              <label className="text-xs font-mono font-semibold text-slate-300 block">KEY RESISTANCE LEVELS</label>
-              <input
-                type="text"
-                value={resistanceLevels}
-                onChange={(e) => setResistanceLevels(e.target.value)}
-                placeholder="e.g. NIFTY 24,680 / SPY 554.00"
-                className="w-full rounded-xl bg-slate-950 border border-slate-800 px-4 py-3 text-xs font-mono text-slate-100 focus:border-emerald-500 focus:outline-none"
-              />
-            </div>
-
-            <div className="space-y-2">
-              <label className="text-xs font-mono font-semibold text-slate-300 block">VWAP / PIVOT TARGETS</label>
-              <input
-                type="text"
-                value={vwapTarget}
-                onChange={(e) => setVwapTarget(e.target.value)}
-                placeholder="e.g. Hold VWAP 24,520 line"
-                className="w-full rounded-xl bg-slate-950 border border-slate-800 px-4 py-3 text-xs font-mono text-slate-100 focus:border-emerald-500 focus:outline-none"
-              />
-            </div>
-          </div>
-
-          <div className="space-y-2">
-            <label className="text-xs font-mono font-semibold text-slate-300 block">MACRO NEWS & ECONOMIC CATALYSTS</label>
-            <input
-              type="text"
-              value={catalysts}
-              onChange={(e) => setCatalysts(e.target.value)}
-              placeholder="e.g. Tech earnings, Central Bank interest rate commentary, NFP data release"
-              className="w-full rounded-xl bg-slate-950 border border-slate-800 px-4 py-3 text-xs font-mono text-slate-100 focus:border-emerald-500 focus:outline-none"
-            />
-          </div>
-        </div>
-
-        {/* Section 3: Daily Rules Commitment & Strategy Notes */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        {/* Section 3: Technical Levels & Custom Rules */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {/* Key Price Levels */}
           <div className="rounded-2xl border border-slate-800 bg-slate-900/60 p-6 space-y-4 shadow-lg">
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 border-b border-slate-800 pb-3">
+              <Target className="h-5 w-5 text-emerald-400" />
+              <h2 className="text-lg font-bold text-slate-100">4. Key Price Levels & Catalysts</h2>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div className="space-y-1">
+                <label className="text-[11px] font-mono text-slate-400">KEY SUPPORT LEVELS</label>
+                <input
+                  type="text"
+                  value={supportLevels}
+                  onChange={(e) => setSupportLevels(e.target.value)}
+                  placeholder="e.g. 5,550 level / 1.0850 zone"
+                  className="w-full rounded-xl bg-slate-950 border border-slate-800 px-3 py-2 text-xs font-mono text-slate-100 focus:border-emerald-500 focus:outline-none"
+                />
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-[11px] font-mono text-slate-400">KEY RESISTANCE LEVELS</label>
+                <input
+                  type="text"
+                  value={resistanceLevels}
+                  onChange={(e) => setResistanceLevels(e.target.value)}
+                  placeholder="e.g. 5,600 level / 1.0910 zone"
+                  className="w-full rounded-xl bg-slate-950 border border-slate-800 px-3 py-2 text-xs font-mono text-slate-100 focus:border-emerald-500 focus:outline-none"
+                />
+              </div>
+            </div>
+
+            <div className="space-y-1">
+              <label className="text-[11px] font-mono text-slate-400">NEWS / MACRO CATALYSTS</label>
+              <input
+                type="text"
+                value={catalysts}
+                onChange={(e) => setCatalysts(e.target.value)}
+                placeholder="e.g. Rate announcement, Economic data release..."
+                className="w-full rounded-xl bg-slate-950 border border-slate-800 px-3 py-2 text-xs font-mono text-slate-100 focus:border-emerald-500 focus:outline-none"
+              />
+            </div>
+          </div>
+
+          {/* Self Rules Commitment */}
+          <div className="rounded-2xl border border-slate-800 bg-slate-900/60 p-6 space-y-4 shadow-lg">
+            <div className="flex items-center gap-2 border-b border-slate-800 pb-3">
               <ShieldAlert className="h-5 w-5 text-amber-400" />
-              <h2 className="text-lg font-bold text-slate-100">4. Daily Rules Commitment</h2>
+              <h2 className="text-lg font-bold text-slate-100">5. Self-Made Rules for Today</h2>
             </div>
 
             <textarea
               rows={4}
               value={rulesCommitment}
               onChange={(e) => setRulesCommitment(e.target.value)}
-              className="w-full rounded-xl bg-slate-950 border border-slate-800 p-4 text-xs font-mono text-slate-100 focus:border-emerald-500 focus:outline-none leading-relaxed"
-            />
-          </div>
-
-          <div className="rounded-2xl border border-slate-800 bg-slate-900/60 p-6 space-y-4 shadow-lg">
-            <div className="flex items-center gap-2">
-              <Sparkles className="h-5 w-5 text-emerald-400" />
-              <h2 className="text-lg font-bold text-slate-100">5. Pre-Market Strategy Notes</h2>
-            </div>
-
-            <textarea
-              rows={4}
-              value={planNotes}
-              onChange={(e) => setPlanNotes(e.target.value)}
-              placeholder="Describe your planned trade setups, entry conditions, and invalidation criteria..."
-              className="w-full rounded-xl bg-slate-950 border border-slate-800 p-4 text-xs font-mono text-slate-100 focus:border-emerald-500 focus:outline-none leading-relaxed"
+              placeholder="List your non-negotiable rules for today's trading session..."
+              className="w-full rounded-xl bg-slate-950 border border-slate-800 p-3 text-xs font-mono text-slate-100 focus:border-emerald-500 focus:outline-none leading-relaxed"
             />
           </div>
         </div>
@@ -349,7 +353,7 @@ export default function TradingPlanPage() {
           <div className="flex items-center gap-4">
             {savedSuccess && (
               <span className="flex items-center gap-1.5 text-xs font-mono text-emerald-400 font-bold">
-                <CheckCircle className="h-4 w-4" /> Plan Saved to DB!
+                <CheckCircle className="h-4 w-4" /> Market View & Plan Saved!
               </span>
             )}
 
@@ -359,7 +363,7 @@ export default function TradingPlanPage() {
               className="flex items-center gap-2 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-600 px-6 py-3 text-xs font-mono font-bold text-slate-950 hover:from-emerald-400 hover:to-teal-500 transition-all shadow-lg shadow-emerald-500/20 disabled:opacity-50 cursor-pointer"
             >
               <Save className="h-4 w-4" />
-              {saving ? 'Saving Plan...' : 'Save Pre-Market Plan'}
+              {saving ? 'Saving...' : 'Save Today\'s Market View'}
             </button>
           </div>
         </div>

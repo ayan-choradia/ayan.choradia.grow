@@ -4,14 +4,13 @@ import {
   LineChart, 
   BarChart3, 
   ShieldCheck, 
-  Zap, 
   ArrowRight, 
-  Target, 
   Activity, 
   CheckCircle2, 
   Brain,
-  Layers,
-  Award
+  Award,
+  MessageSquareText,
+  Clipboard
 } from 'lucide-react';
 import { prisma } from '@/lib/prisma';
 import { SAMPLE_TRADES, SAMPLE_PLANS } from '@/lib/sample-data';
@@ -48,19 +47,19 @@ export default async function HomePage() {
         <div className="relative max-w-3xl space-y-6">
           <div className="inline-flex items-center gap-2 rounded-full bg-emerald-500/10 px-3 py-1 font-mono text-xs font-semibold text-emerald-400 border border-emerald-500/20">
             <Activity className="h-3.5 w-3.5 animate-pulse text-emerald-400" />
-            DISCIPLINED TRADING & QUANT DEVELOPMENT PLATFORM
+            PERSONAL TRADING JOURNAL & MARKET VIEW PLATFORM
           </div>
 
           <h1 className="text-4xl sm:text-5xl lg:text-6xl font-extrabold tracking-tight text-white leading-tight">
-            Structure. Discipline. <br />
+            Write Your Market View. <br />
             <span className="bg-gradient-to-r from-emerald-400 via-teal-300 to-cyan-400 bg-clip-text text-transparent">
-              Systematic Execution.
+              Paste Charts & Log Executions.
             </span>
           </h1>
 
           <p className="text-base sm:text-lg text-slate-300 leading-relaxed">
-            Welcome to the personal quantitative hub of <strong className="text-white font-semibold">Ayan Choradia</strong>. 
-            Combining market structure analysis, systematic trade planning, emotion auditing, and real-time execution journaling.
+            Welcome to the personal trading suite of <strong className="text-white font-semibold">Ayan Choradia</strong>. 
+            Write your daily market view, paste chart screenshots directly from your terminal (`Ctrl+V`), log trades for any product, track self-made rules adherence, and review your daily learnings.
           </p>
 
           {/* Quick Action Grid */}
@@ -71,13 +70,13 @@ export default async function HomePage() {
             >
               <div className="flex items-center justify-between">
                 <div className="rounded-xl bg-emerald-500/10 p-2.5 text-emerald-400 border border-emerald-500/20 group-hover:scale-110 transition-transform">
-                  <Calendar className="h-5 w-5" />
+                  <MessageSquareText className="h-5 w-5" />
                 </div>
                 <ArrowRight className="h-4 w-4 text-slate-500 group-hover:text-emerald-400 group-hover:translate-x-1 transition-all" />
               </div>
               <div className="mt-4">
-                <h3 className="font-semibold text-slate-100 group-hover:text-emerald-400 transition-colors">Daily Plan</h3>
-                <p className="text-xs text-slate-400 font-mono mt-1">Pre-Market Bias & Emotion Audit</p>
+                <h3 className="font-semibold text-slate-100 group-hover:text-emerald-400 transition-colors">Daily Market View</h3>
+                <p className="text-xs text-slate-400 font-mono mt-1">Write Pre-Market Thesis & Emotion Check</p>
               </div>
             </Link>
 
@@ -92,8 +91,8 @@ export default async function HomePage() {
                 <ArrowRight className="h-4 w-4 text-slate-500 group-hover:text-cyan-400 group-hover:translate-x-1 transition-all" />
               </div>
               <div className="mt-4">
-                <h3 className="font-semibold text-slate-100 group-hover:text-cyan-400 transition-colors">Trade Journal</h3>
-                <p className="text-xs text-slate-400 font-mono mt-1">Log Trades & Rule Compliance</p>
+                <h3 className="font-semibold text-slate-100 group-hover:text-cyan-400 transition-colors">Trade Execution Log</h3>
+                <p className="text-xs text-slate-400 font-mono mt-1">Paste Chart Screenshots & Log Results</p>
               </div>
             </Link>
 
@@ -109,27 +108,27 @@ export default async function HomePage() {
               </div>
               <div className="mt-4">
                 <h3 className="font-semibold text-slate-100 group-hover:text-teal-400 transition-colors">Analytics Engine</h3>
-                <p className="text-xs text-slate-400 font-mono mt-1">Equity Curve & Emotion Matrix</p>
+                <p className="text-xs text-slate-400 font-mono mt-1">Equity Curve & Rule Adherence Score</p>
               </div>
             </Link>
           </div>
         </div>
       </section>
 
-      {/* Today's Market Outlook & Active Pre-Market Plan */}
+      {/* Today's Market View & Pre-Market Plan */}
       <section className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="lg:col-span-2 rounded-2xl border border-slate-800 bg-slate-900/50 p-6 space-y-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
               <Brain className="h-5 w-5 text-emerald-400" />
-              <h2 className="text-lg font-bold text-slate-100">Today's Pre-Market Plan Overview</h2>
+              <h2 className="text-lg font-bold text-slate-100">Today's Pre-Market View</h2>
             </div>
             <span className="rounded-full bg-slate-800 px-3 py-1 text-xs font-mono text-slate-300">
               {todayPlan?.date ? new Date(todayPlan.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : 'Today'}
             </span>
           </div>
 
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 font-mono text-xs">
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 font-mono text-xs">
             <div className="rounded-xl bg-slate-950/80 p-3 border border-slate-800">
               <span className="text-slate-500 text-[10px] block">MARKET BIAS</span>
               <span className={`font-bold text-sm ${
@@ -147,25 +146,18 @@ export default async function HomePage() {
               </span>
             </div>
 
-            <div className="rounded-xl bg-slate-950/80 p-3 border border-slate-800">
-              <span className="text-slate-500 text-[10px] block">KEY SUPPORT</span>
-              <span className="font-semibold text-slate-200 truncate block">
-                {todayPlan?.supportLevels || '24,450'}
-              </span>
-            </div>
-
-            <div className="rounded-xl bg-slate-950/80 p-3 border border-slate-800">
-              <span className="text-slate-500 text-[10px] block">KEY RESISTANCE</span>
-              <span className="font-semibold text-slate-200 truncate block">
-                {todayPlan?.resistanceLevels || '24,680'}
+            <div className="rounded-xl bg-slate-950/80 p-3 border border-slate-800 col-span-2 sm:col-span-1">
+              <span className="text-slate-500 text-[10px] block">CHART SCREENSHOT</span>
+              <span className="font-bold text-sm text-emerald-400">
+                {todayPlan?.chartImage ? 'Attached (Ctrl+V)' : 'None'}
               </span>
             </div>
           </div>
 
           <div className="rounded-xl bg-slate-950/60 p-4 border border-slate-800/80 space-y-2 text-xs">
-            <span className="text-slate-400 font-mono font-semibold">PRE-MARKET NOTES & STRATEGY:</span>
+            <span className="text-slate-400 font-mono font-semibold">YOUR TODAY'S MARKET THESIS:</span>
             <p className="text-slate-300 leading-relaxed">
-              {todayPlan?.planNotes || 'Wait patiently for liquidity sweeps near key support before confirming momentum direction.'}
+              {todayPlan?.planNotes || 'Write your market view upon today\'s session, key level invalidation points, and execution plan.'}
             </p>
           </div>
 
@@ -174,38 +166,38 @@ export default async function HomePage() {
               href="/plan"
               className="inline-flex items-center gap-2 text-xs font-mono font-semibold text-emerald-400 hover:text-emerald-300 transition-colors"
             >
-              Open Full Daily Plan Editor <ArrowRight className="h-3.5 w-3.5" />
+              Open Daily Market View Editor <ArrowRight className="h-3.5 w-3.5" />
             </Link>
           </div>
         </div>
 
-        {/* Core Rules Framework */}
+        {/* Self-Made Rules Framework */}
         <div className="rounded-2xl border border-slate-800 bg-slate-900/50 p-6 space-y-4">
           <div className="flex items-center gap-2">
             <ShieldCheck className="h-5 w-5 text-emerald-400" />
-            <h2 className="text-lg font-bold text-slate-100">Non-Negotiable Rules</h2>
+            <h2 className="text-lg font-bold text-slate-100">Self-Made Trading Rules</h2>
           </div>
 
           <ul className="space-y-3 text-xs">
             <li className="flex items-start gap-3 rounded-xl bg-slate-950/80 p-3 border border-slate-800">
               <CheckCircle2 className="h-4 w-4 text-emerald-400 shrink-0 mt-0.5" />
               <div>
-                <strong className="text-slate-200 block">Strict Risk-to-Reward (1:2 Min)</strong>
-                <span className="text-slate-400">Never take a trade where potential reward is less than twice the risk.</span>
+                <strong className="text-slate-200 block">Strict Risk-to-Reward Ratio</strong>
+                <span className="text-slate-400">Never take a trade where potential reward is less than your minimum target.</span>
               </div>
             </li>
             <li className="flex items-start gap-3 rounded-xl bg-slate-950/80 p-3 border border-slate-800">
               <CheckCircle2 className="h-4 w-4 text-emerald-400 shrink-0 mt-0.5" />
               <div>
-                <strong className="text-slate-200 block">Max 2 Trades Per Session</strong>
-                <span className="text-slate-400">Avoid overtrading and revenge trades after a loss. Quality over quantity.</span>
+                <strong className="text-slate-200 block">Respect Stop Loss Always</strong>
+                <span className="text-slate-400">Pre-place your hard stop loss and never widen it during live trades.</span>
               </div>
             </li>
             <li className="flex items-start gap-3 rounded-xl bg-slate-950/80 p-3 border border-slate-800">
               <CheckCircle2 className="h-4 w-4 text-emerald-400 shrink-0 mt-0.5" />
               <div>
-                <strong className="text-slate-200 block">Pre-Placed Hard Stop Loss</strong>
-                <span className="text-slate-400">Stop loss must be calculated and entered directly into the terminal.</span>
+                <strong className="text-slate-200 block">Paste Chart Screenshots (Ctrl+V)</strong>
+                <span className="text-slate-400">Attach chart screenshots for pre-market views and trade logs for visual review.</span>
               </div>
             </li>
           </ul>
@@ -216,14 +208,14 @@ export default async function HomePage() {
       <section className="space-y-4">
         <div className="flex items-center justify-between">
           <div>
-            <h2 className="text-xl font-bold text-slate-100">Recent Journaled Trades</h2>
-            <p className="text-xs text-slate-400 font-mono">Live executions & verified rule score adherence</p>
+            <h2 className="text-xl font-bold text-slate-100">Recent Executed Trades</h2>
+            <p className="text-xs text-slate-400 font-mono">Logged executions & self-made rule adherence score</p>
           </div>
           <Link
             href="/execution"
             className="inline-flex items-center gap-1.5 rounded-lg bg-slate-800 px-3 py-1.5 text-xs font-mono font-medium text-slate-200 hover:bg-slate-700 transition-colors"
           >
-            View All Trades <ArrowRight className="h-3.5 w-3.5" />
+            Log & View All Trades <ArrowRight className="h-3.5 w-3.5" />
           </Link>
         </div>
 

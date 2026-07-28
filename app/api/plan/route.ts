@@ -44,7 +44,7 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-    const { date, dayOfWeek, marketBias, emotionState, supportLevels, resistanceLevels, vwapTarget, catalysts, rulesCommitment, planNotes } = body;
+    const { date, dayOfWeek, marketBias, emotionState, supportLevels, resistanceLevels, vwapTarget, catalysts, rulesCommitment, planNotes, chartImage } = body;
 
     const planDate = new Date(date);
 
@@ -60,6 +60,7 @@ export async function POST(request: Request) {
         catalysts,
         rulesCommitment,
         planNotes,
+        chartImage,
       },
       create: {
         date: planDate,
@@ -72,6 +73,7 @@ export async function POST(request: Request) {
         catalysts,
         rulesCommitment,
         planNotes,
+        chartImage,
       }
     });
 

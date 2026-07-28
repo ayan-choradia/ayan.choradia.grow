@@ -19,6 +19,7 @@ model TradingPlan {
   catalysts        String?
   rulesCommitment  String?
   planNotes        String?
+  chartImage       String?
   createdAt        DateTime         @default(now())
   updatedAt        DateTime         @updatedAt
   executions       TradeExecution[]
