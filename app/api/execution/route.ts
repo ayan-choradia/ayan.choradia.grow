@@ -180,3 +180,34 @@ export async function POST(request: Request) {
     return NextResponse.json({ success: false, error: error?.message }, { status: 500 });
   }
 }
+
+export async function DELETE(request: Request) {
+  try {
+    const { searchParams } = new URL(request.url);
+    const id = searchParams.get('id');
+
+    if (id === 'all') {
+      try {
+        await prisma.tradeExecution.deleteMany({});
+      } catch (dbErr) {
+        console.warn('DB deleteMany failed:', dbErr);
+      }
+      return NextResponse.json({ success: true, message: 'All trades deleted' });
+    }
+
+    if (id) {
+      try {
+        await prisma.tradeExecution.delete({
+          where: { id }
+        });
+      } catch (dbErr) {
+        console.warn(`DB delete trade ${id} failed:`, dbErr);
+      }
+      return NextResponse.json({ success: true, message: `Trade ${id} deleted` });
+    }
+
+    return NextResponse.json({ success: false, error: 'Missing trade ID' }, { status: 400 });
+  } catch (error: any) {
+    return NextResponse.json({ success: false, error: error?.message }, { status: 500 });
+  }
+}

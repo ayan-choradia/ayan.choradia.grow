@@ -16,7 +16,9 @@ import {
   BookOpen,
   Star,
   Maximize2,
-  X
+  X,
+  Trash2,
+  RotateCcw
 } from 'lucide-react';
 import { formatDateForInput, formatDateDisplay } from '@/lib/date-utils';
 import ImagePasteInput from '@/components/ImagePasteInput';
@@ -62,10 +64,8 @@ export default function TradeExecutionPage() {
   const fetchTradesAndReflections = async () => {
     setLoading(true);
 
-    // 1. Read from LocalStorage for instant client-side persistence
+    // Read from LocalStorage first
     let localTrades: any[] = [];
-    let localReflections: any[] = [];
-
     if (typeof window !== 'undefined') {
       try {
         const storedT = localStorage.getItem('user_executed_trades');
@@ -91,9 +91,13 @@ export default function TradeExecutionPage() {
         const apiTrades = json.data.trades || [];
         const apiReflections = json.data.reflections || [];
 
-        // Combine local and API trades cleanly
-        const combinedTrades = [...localTrades, ...apiTrades.filter((at: any) => !localTrades.some(lt => lt.id === at.id))];
-        setTrades(combinedTrades);
+        // If user has customized local trades (including deletions), prioritize local storage
+        if (typeof window !== 'undefined' && localStorage.getItem('user_executed_trades') !== null) {
+          setTrades(localTrades);
+        } else {
+          setTrades(apiTrades);
+        }
+
         setReflections(apiReflections);
 
         const todayRef = apiReflections.find((r: any) => 
@@ -170,12 +174,11 @@ export default function TradeExecutionPage() {
       ruleScore
     };
 
-    // 1. Save immediately to LocalStorage (Guarantees local persistence on Vercel/Netlify)
+    // 1. Save immediately to LocalStorage
+    const updated = [newTradeObj, ...trades];
+    setTrades(updated);
     if (typeof window !== 'undefined') {
-      const existing = JSON.parse(localStorage.getItem('user_executed_trades') || '[]');
-      const updated = [newTradeObj, ...existing];
       localStorage.setItem('user_executed_trades', JSON.stringify(updated));
-      setTrades(updated);
     }
 
     // 2. Also send to API endpoint
@@ -202,7 +205,7 @@ export default function TradeExecutionPage() {
         })
       });
     } catch (err) {
-      console.warn('API save notice (fallback used):', err);
+      console.warn('API save notice:', err);
     } finally {
       setSubmittingTrade(false);
       // Reset form
@@ -213,6 +216,38 @@ export default function TradeExecutionPage() {
       setTakeProfit('');
       setNotes('');
       setChartUrl('');
+    }
+  };
+
+  // Delete a single logged trade
+  const handleDeleteTrade = async (tradeId: string) => {
+    const filtered = trades.filter(t => t.id !== tradeId);
+    setTrades(filtered);
+
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('user_executed_trades', JSON.stringify(filtered));
+    }
+
+    try {
+      await fetch(`/api/execution?id=${tradeId}`, { method: 'DELETE' });
+    } catch (err) {
+      console.warn('API delete notice:', err);
+    }
+  };
+
+  // Delete all logged trades
+  const handleClearAllTrades = async () => {
+    if (!confirm('Are you sure you want to delete all logged trades?')) return;
+
+    setTrades([]);
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('user_executed_trades', JSON.stringify([]));
+    }
+
+    try {
+      await fetch(`/api/execution?id=all`, { method: 'DELETE' });
+    } catch (err) {
+      console.warn('API clear all notice:', err);
     }
   };
 
@@ -230,12 +265,10 @@ export default function TradeExecutionPage() {
       ruleAdherenceScore: 100
     };
 
-    // 1. Save immediately to LocalStorage (Guarantees local persistence on Vercel/Netlify)
     if (typeof window !== 'undefined') {
       localStorage.setItem(`user_reflection_${selectedDate}`, JSON.stringify(reflectionObj));
     }
 
-    // 2. Also send to API endpoint
     try {
       await fetch('/api/execution', {
         method: 'POST',
@@ -246,7 +279,7 @@ export default function TradeExecutionPage() {
         })
       });
     } catch (err) {
-      console.warn('API reflection save notice (fallback used):', err);
+      console.warn('API reflection save notice:', err);
     } finally {
       setSavingReflection(false);
       setSavedSuccess(true);
@@ -480,8 +513,20 @@ export default function TradeExecutionPage() {
           {/* Trade Executions History Table */}
           <div className="rounded-2xl border border-slate-800 bg-slate-900/60 p-6 space-y-4 shadow-xl">
             <div className="flex items-center justify-between">
-              <h2 className="text-lg font-bold text-slate-100">Logged Executed Trades</h2>
-              <span className="font-mono text-xs text-slate-400">{trades.length} Total Trades Recorded</span>
+              <div>
+                <h2 className="text-lg font-bold text-slate-100">Logged Executed Trades</h2>
+                <span className="font-mono text-xs text-slate-400">{trades.length} Total Trades Recorded</span>
+              </div>
+
+              {trades.length > 0 && (
+                <button
+                  type="button"
+                  onClick={handleClearAllTrades}
+                  className="flex items-center gap-1.5 rounded-xl bg-rose-950/40 hover:bg-rose-900/60 border border-rose-800/40 px-3 py-1.5 font-mono text-xs text-rose-300 transition-colors cursor-pointer"
+                >
+                  <Trash2 className="h-3.5 w-3.5" /> Clear All Trades
+                </button>
+              )}
             </div>
 
             <div className="overflow-x-auto">
@@ -496,55 +541,74 @@ export default function TradeExecutionPage() {
                     <th className="pb-3 pt-2">R-MULTIPLE</th>
                     <th className="pb-3 pt-2">RULES SCORE</th>
                     <th className="pb-3 pt-2">CHART</th>
+                    <th className="pb-3 pt-2 text-right">ACTION</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-800/60">
-                  {trades.map((t) => {
-                    const isWin = (t.pnl || 0) >= 0;
-                    return (
-                      <tr key={t.id} className="hover:bg-slate-800/40 transition-colors">
-                        <td className="py-3 text-slate-300">
-                          {new Date(t.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
-                        </td>
-                        <td className="py-3 font-bold text-slate-100">{t.symbol}</td>
-                        <td className="py-3">
-                          <span className={`px-2 py-0.5 text-[10px] font-bold rounded ${
-                            t.side === 'LONG' ? 'bg-emerald-500/20 text-emerald-400' : 'bg-rose-500/20 text-rose-400'
-                          }`}>
-                            {t.side}
-                          </span>
-                        </td>
-                        <td className="py-3 text-slate-300">
-                          {t.entryPrice} / {t.exitPrice !== null && t.exitPrice !== undefined ? t.exitPrice : 'OPEN'}
-                        </td>
-                        <td className={`py-3 font-bold ${isWin ? 'text-emerald-400' : 'text-rose-400'}`}>
-                          {t.pnl !== null && t.pnl !== undefined ? (isWin ? `+$${t.pnl}` : `-$${Math.abs(t.pnl)}`) : 'OPEN'}
-                        </td>
-                        <td className="py-3 text-slate-200">
-                          {t.rMultiple ? `${t.rMultiple > 0 ? '+' : ''}${t.rMultiple}R` : '-'}
-                        </td>
-                        <td className="py-3">
-                          <span className="text-emerald-400 font-bold flex items-center gap-1">
-                            <Award className="h-3 w-3" />
-                            {t.ruleScore}%
-                          </span>
-                        </td>
-                        <td className="py-3">
-                          {t.chartUrl ? (
+                  {trades.length === 0 ? (
+                    <tr>
+                      <td colSpan={9} className="py-8 text-center text-slate-500 font-mono text-xs">
+                        No trades logged yet. Fill out the form above to add your first trade execution.
+                      </td>
+                    </tr>
+                  ) : (
+                    trades.map((t) => {
+                      const isWin = (t.pnl || 0) >= 0;
+                      return (
+                        <tr key={t.id} className="hover:bg-slate-800/40 transition-colors group">
+                          <td className="py-3 text-slate-300">
+                            {new Date(t.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                          </td>
+                          <td className="py-3 font-bold text-slate-100">{t.symbol}</td>
+                          <td className="py-3">
+                            <span className={`px-2 py-0.5 text-[10px] font-bold rounded ${
+                              t.side === 'LONG' ? 'bg-emerald-500/20 text-emerald-400' : 'bg-rose-500/20 text-rose-400'
+                            }`}>
+                              {t.side}
+                            </span>
+                          </td>
+                          <td className="py-3 text-slate-300">
+                            {t.entryPrice} / {t.exitPrice !== null && t.exitPrice !== undefined ? t.exitPrice : 'OPEN'}
+                          </td>
+                          <td className={`py-3 font-bold ${isWin ? 'text-emerald-400' : 'text-rose-400'}`}>
+                            {t.pnl !== null && t.pnl !== undefined ? (isWin ? `+$${t.pnl}` : `-$${Math.abs(t.pnl)}`) : 'OPEN'}
+                          </td>
+                          <td className="py-3 text-slate-200">
+                            {t.rMultiple ? `${t.rMultiple > 0 ? '+' : ''}${t.rMultiple}R` : '-'}
+                          </td>
+                          <td className="py-3">
+                            <span className="text-emerald-400 font-bold flex items-center gap-1">
+                              <Award className="h-3 w-3" />
+                              {t.ruleScore}%
+                            </span>
+                          </td>
+                          <td className="py-3">
+                            {t.chartUrl ? (
+                              <button
+                                type="button"
+                                onClick={() => setPreviewImage(t.chartUrl)}
+                                className="text-cyan-400 hover:underline flex items-center gap-1 font-semibold cursor-pointer"
+                              >
+                                <Maximize2 className="h-3 w-3" /> View Chart
+                              </button>
+                            ) : (
+                              <span className="text-slate-600">-</span>
+                            )}
+                          </td>
+                          <td className="py-3 text-right">
                             <button
                               type="button"
-                              onClick={() => setPreviewImage(t.chartUrl)}
-                              className="text-cyan-400 hover:underline flex items-center gap-1 font-semibold cursor-pointer"
+                              onClick={() => handleDeleteTrade(t.id)}
+                              className="p-1.5 rounded-lg text-slate-500 hover:text-rose-400 hover:bg-rose-950/40 transition-colors cursor-pointer"
+                              title="Delete Trade"
                             >
-                              <Maximize2 className="h-3 w-3" /> View Chart
+                              <Trash2 className="h-4 w-4" />
                             </button>
-                          ) : (
-                            <span className="text-slate-600">-</span>
-                          )}
-                        </td>
-                      </tr>
-                    );
-                  })}
+                          </td>
+                        </tr>
+                      );
+                    })
+                  )}
                 </tbody>
               </table>
             </div>
