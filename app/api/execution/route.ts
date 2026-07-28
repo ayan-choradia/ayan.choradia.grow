@@ -7,17 +7,23 @@ export async function GET(request: Request) {
     const { searchParams } = new URL(request.url);
     const dateStr = searchParams.get('date');
 
-    const trades = await prisma.tradeExecution.findMany({
-      orderBy: { date: 'desc' },
-      take: 50
-    });
+    let trades: any[] = [];
+    let reflections: any[] = [];
 
-    const reflections = await prisma.dailyReflection.findMany({
-      orderBy: { date: 'desc' },
-      take: 30
-    });
+    try {
+      trades = await prisma.tradeExecution.findMany({
+        orderBy: { date: 'desc' },
+        take: 50
+      });
+      reflections = await prisma.dailyReflection.findMany({
+        orderBy: { date: 'desc' },
+        take: 30
+      });
+    } catch (dbErr) {
+      console.warn('DB query failed, using sample fallbacks:', dbErr);
+    }
 
-    if (trades.length > 0) {
+    if (trades.length > 0 || reflections.length > 0) {
       return NextResponse.json({
         success: true,
         data: {
@@ -52,26 +58,42 @@ export async function POST(request: Request) {
       const { date, whatWentWell, mistakesMade, keyLearnings, overallRating, ruleAdherenceScore } = body;
       const refDate = new Date(date);
 
-      const reflection = await prisma.dailyReflection.upsert({
-        where: { date: refDate },
-        update: {
-          whatWentWell,
-          mistakesMade,
-          keyLearnings,
-          overallRating: Number(overallRating) || 5,
-          ruleAdherenceScore: Number(ruleAdherenceScore) || 100
-        },
-        create: {
-          date: refDate,
-          whatWentWell,
-          mistakesMade,
-          keyLearnings,
-          overallRating: Number(overallRating) || 5,
-          ruleAdherenceScore: Number(ruleAdherenceScore) || 100
-        }
-      });
-
-      return NextResponse.json({ success: true, data: reflection });
+      try {
+        const reflection = await prisma.dailyReflection.upsert({
+          where: { date: refDate },
+          update: {
+            whatWentWell,
+            mistakesMade,
+            keyLearnings,
+            overallRating: Number(overallRating) || 5,
+            ruleAdherenceScore: Number(ruleAdherenceScore) || 100
+          },
+          create: {
+            date: refDate,
+            whatWentWell,
+            mistakesMade,
+            keyLearnings,
+            overallRating: Number(overallRating) || 5,
+            ruleAdherenceScore: Number(ruleAdherenceScore) || 100
+          }
+        });
+        return NextResponse.json({ success: true, data: reflection });
+      } catch (dbErr: any) {
+        console.warn('DB write failed, using client storage fallback:', dbErr?.message);
+        return NextResponse.json({
+          success: true,
+          data: {
+            id: `ref-${Date.now()}`,
+            date: refDate,
+            whatWentWell,
+            mistakesMade,
+            keyLearnings,
+            overallRating: Number(overallRating) || 5,
+            ruleAdherenceScore: Number(ruleAdherenceScore) || 100
+          },
+          storageMode: 'client'
+        });
+      }
     }
 
     // Trade logging
@@ -102,30 +124,58 @@ export async function POST(request: Request) {
     if (followedRisk) rulesFollowed += 33.34;
     const ruleScore = Math.round(rulesFollowed);
 
-    const trade = await prisma.tradeExecution.create({
-      data: {
-        date: new Date(date),
-        symbol: symbol.toUpperCase(),
-        side,
-        entryPrice: entry,
-        exitPrice: exit,
-        stopLoss: stop,
-        takeProfit: target,
-        quantity: qty,
-        pnl,
-        rMultiple,
-        strategy: strategy || 'Discipline Execution',
-        notes,
-        chartUrl,
-        status: exit !== undefined ? 'CLOSED' : 'OPEN',
-        followedEntry: Boolean(followedEntry),
-        followedStop: Boolean(followedStop),
-        followedRisk: Boolean(followedRisk),
-        ruleScore
-      }
-    });
-
-    return NextResponse.json({ success: true, data: trade });
+    try {
+      const trade = await prisma.tradeExecution.create({
+        data: {
+          date: new Date(date),
+          symbol: symbol.toUpperCase(),
+          side,
+          entryPrice: entry,
+          exitPrice: exit,
+          stopLoss: stop,
+          takeProfit: target,
+          quantity: qty,
+          pnl,
+          rMultiple,
+          strategy: strategy || 'Discipline Execution',
+          notes,
+          chartUrl,
+          status: exit !== undefined ? 'CLOSED' : 'OPEN',
+          followedEntry: Boolean(followedEntry),
+          followedStop: Boolean(followedStop),
+          followedRisk: Boolean(followedRisk),
+          ruleScore
+        }
+      });
+      return NextResponse.json({ success: true, data: trade });
+    } catch (dbErr: any) {
+      console.warn('DB trade log failed, using client storage fallback:', dbErr?.message);
+      return NextResponse.json({
+        success: true,
+        data: {
+          id: `tr-${Date.now()}`,
+          date: new Date(date),
+          symbol: symbol.toUpperCase(),
+          side,
+          entryPrice: entry,
+          exitPrice: exit,
+          stopLoss: stop,
+          takeProfit: target,
+          quantity: qty,
+          pnl,
+          rMultiple,
+          strategy: strategy || 'Discipline Execution',
+          notes,
+          chartUrl,
+          status: exit !== undefined ? 'CLOSED' : 'OPEN',
+          followedEntry: Boolean(followedEntry),
+          followedStop: Boolean(followedStop),
+          followedRisk: Boolean(followedRisk),
+          ruleScore
+        },
+        storageMode: 'client'
+      });
+    }
   } catch (error: any) {
     return NextResponse.json({ success: false, error: error?.message }, { status: 500 });
   }

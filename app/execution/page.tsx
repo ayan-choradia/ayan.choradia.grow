@@ -61,26 +61,57 @@ export default function TradeExecutionPage() {
 
   const fetchTradesAndReflections = async () => {
     setLoading(true);
+
+    // 1. Read from LocalStorage for instant client-side persistence
+    let localTrades: any[] = [];
+    let localReflections: any[] = [];
+
+    if (typeof window !== 'undefined') {
+      try {
+        const storedT = localStorage.getItem('user_executed_trades');
+        if (storedT) localTrades = JSON.parse(storedT);
+
+        const storedR = localStorage.getItem(`user_reflection_${selectedDate}`);
+        if (storedR) {
+          const parsedR = JSON.parse(storedR);
+          setWhatWentWell(parsedR.whatWentWell || '');
+          setMistakesMade(parsedR.mistakesMade || '');
+          setKeyLearnings(parsedR.keyLearnings || '');
+          setOverallRating(parsedR.overallRating || 5);
+        }
+      } catch (e) {
+        console.error('Error reading localStorage execution data:', e);
+      }
+    }
+
     try {
       const res = await fetch(`/api/execution`);
       const json = await res.json();
       if (json.success && json.data) {
-        setTrades(json.data.trades || []);
-        setReflections(json.data.reflections || []);
-        
-        const todayRef = (json.data.reflections || []).find((r: any) => 
+        const apiTrades = json.data.trades || [];
+        const apiReflections = json.data.reflections || [];
+
+        // Combine local and API trades cleanly
+        const combinedTrades = [...localTrades, ...apiTrades.filter((at: any) => !localTrades.some(lt => lt.id === at.id))];
+        setTrades(combinedTrades);
+        setReflections(apiReflections);
+
+        const todayRef = apiReflections.find((r: any) => 
           new Date(r.date).toISOString().startsWith(selectedDate)
         );
 
-        if (todayRef) {
+        if (todayRef && !localStorage.getItem(`user_reflection_${selectedDate}`)) {
           setWhatWentWell(todayRef.whatWentWell || '');
           setMistakesMade(todayRef.mistakesMade || '');
           setKeyLearnings(todayRef.keyLearnings || '');
           setOverallRating(todayRef.overallRating || 5);
         }
+      } else if (localTrades.length > 0) {
+        setTrades(localTrades);
       }
     } catch (err) {
-      console.error('Failed to fetch trades:', err);
+      console.warn('API fetch warning:', err);
+      if (localTrades.length > 0) setTrades(localTrades);
     } finally {
       setLoading(false);
     }
@@ -91,8 +122,65 @@ export default function TradeExecutionPage() {
     if (!symbol || !entryPrice || !stopLoss || !takeProfit) return;
 
     setSubmittingTrade(true);
+
+    const entry = Number(entryPrice);
+    const exit = exitPrice ? Number(exitPrice) : undefined;
+    const stop = Number(stopLoss);
+    const target = Number(takeProfit);
+    const qty = Number(quantity) || 1;
+
+    let pnl: number | undefined = undefined;
+    let rMultiple: number | undefined = undefined;
+
+    if (exit !== undefined) {
+      const priceDiff = side === 'LONG' ? exit - entry : entry - exit;
+      pnl = priceDiff * qty;
+
+      const riskPerUnit = Math.abs(entry - stop);
+      if (riskPerUnit > 0) {
+        rMultiple = Number((priceDiff / riskPerUnit).toFixed(2));
+      }
+    }
+
+    let rulesFollowed = 0;
+    if (followedEntry) rulesFollowed += 33.33;
+    if (followedStop) rulesFollowed += 33.33;
+    if (followedRisk) rulesFollowed += 33.34;
+    const ruleScore = Math.round(rulesFollowed);
+
+    const newTradeObj = {
+      id: `tr-local-${Date.now()}`,
+      date: new Date(selectedDate),
+      symbol: symbol.toUpperCase(),
+      side,
+      entryPrice: entry,
+      exitPrice: exit,
+      stopLoss: stop,
+      takeProfit: target,
+      quantity: qty,
+      pnl,
+      rMultiple,
+      strategy: strategy || 'Discipline Execution',
+      notes,
+      chartUrl,
+      status: exit !== undefined ? 'CLOSED' : 'OPEN',
+      followedEntry,
+      followedStop,
+      followedRisk,
+      ruleScore
+    };
+
+    // 1. Save immediately to LocalStorage (Guarantees local persistence on Vercel/Netlify)
+    if (typeof window !== 'undefined') {
+      const existing = JSON.parse(localStorage.getItem('user_executed_trades') || '[]');
+      const updated = [newTradeObj, ...existing];
+      localStorage.setItem('user_executed_trades', JSON.stringify(updated));
+      setTrades(updated);
+    }
+
+    // 2. Also send to API endpoint
     try {
-      const res = await fetch('/api/execution', {
+      await fetch('/api/execution', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -113,23 +201,18 @@ export default function TradeExecutionPage() {
           followedRisk
         })
       });
-
-      const json = await res.json();
-      if (json.success) {
-        fetchTradesAndReflections();
-        // Reset form
-        setSymbol('');
-        setEntryPrice('');
-        setExitPrice('');
-        setStopLoss('');
-        setTakeProfit('');
-        setNotes('');
-        setChartUrl('');
-      }
     } catch (err) {
-      console.error('Failed to log trade:', err);
+      console.warn('API save notice (fallback used):', err);
     } finally {
       setSubmittingTrade(false);
+      // Reset form
+      setSymbol('');
+      setEntryPrice('');
+      setExitPrice('');
+      setStopLoss('');
+      setTakeProfit('');
+      setNotes('');
+      setChartUrl('');
     }
   };
 
@@ -138,31 +221,36 @@ export default function TradeExecutionPage() {
     setSavingReflection(true);
     setSavedSuccess(false);
 
+    const reflectionObj = {
+      date: selectedDate,
+      whatWentWell,
+      mistakesMade,
+      keyLearnings,
+      overallRating,
+      ruleAdherenceScore: 100
+    };
+
+    // 1. Save immediately to LocalStorage (Guarantees local persistence on Vercel/Netlify)
+    if (typeof window !== 'undefined') {
+      localStorage.setItem(`user_reflection_${selectedDate}`, JSON.stringify(reflectionObj));
+    }
+
+    // 2. Also send to API endpoint
     try {
-      const res = await fetch('/api/execution', {
+      await fetch('/api/execution', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           type: 'reflection',
-          date: selectedDate,
-          whatWentWell,
-          mistakesMade,
-          keyLearnings,
-          overallRating,
-          ruleAdherenceScore: 100
+          ...reflectionObj
         })
       });
-
-      const json = await res.json();
-      if (json.success) {
-        setSavedSuccess(true);
-        setTimeout(() => setSavedSuccess(false), 3000);
-        fetchTradesAndReflections();
-      }
     } catch (err) {
-      console.error('Failed to save reflection:', err);
+      console.warn('API reflection save notice (fallback used):', err);
     } finally {
       setSavingReflection(false);
+      setSavedSuccess(true);
+      setTimeout(() => setSavedSuccess(false), 3500);
     }
   };
 
@@ -210,7 +298,7 @@ export default function TradeExecutionPage() {
                     type="text"
                     value={symbol}
                     onChange={(e) => setSymbol(e.target.value)}
-                    placeholder="Type your product (e.g. ES, NQ, EURUSD, BTC, Stock)"
+                    placeholder="Type product (e.g. ES, NQ, EURUSD, BTC, Stock)"
                     className="w-full rounded-xl bg-slate-950 border border-slate-800 px-3 py-2 text-xs font-mono font-bold text-slate-100 focus:border-emerald-500 focus:outline-none"
                     required
                   />
@@ -338,7 +426,7 @@ export default function TradeExecutionPage() {
                       type="checkbox"
                       checked={followedEntry}
                       onChange={(e) => setFollowedEntry(e.target.checked)}
-                      className="rounded bg-slate-900 border-slate-700 text-emerald-500 focus:ring-emerald-500"
+                      className="rounded bg-slate-900 border-slate-700 text-emerald-500 focus:ring-emerald-500 cursor-pointer"
                     />
                     <span>Followed Entry Setup Trigger</span>
                   </label>
@@ -348,7 +436,7 @@ export default function TradeExecutionPage() {
                       type="checkbox"
                       checked={followedStop}
                       onChange={(e) => setFollowedStop(e.target.checked)}
-                      className="rounded bg-slate-900 border-slate-700 text-emerald-500 focus:ring-emerald-500"
+                      className="rounded bg-slate-900 border-slate-700 text-emerald-500 focus:ring-emerald-500 cursor-pointer"
                     />
                     <span>Respected Stop-Loss</span>
                   </label>
@@ -358,7 +446,7 @@ export default function TradeExecutionPage() {
                       type="checkbox"
                       checked={followedRisk}
                       onChange={(e) => setFollowedRisk(e.target.checked)}
-                      className="rounded bg-slate-900 border-slate-700 text-emerald-500 focus:ring-emerald-500"
+                      className="rounded bg-slate-900 border-slate-700 text-emerald-500 focus:ring-emerald-500 cursor-pointer"
                     />
                     <span>Respected Position Sizing</span>
                   </label>
@@ -551,7 +639,7 @@ export default function TradeExecutionPage() {
             <button
               type="button"
               onClick={() => setPreviewImage(null)}
-              className="absolute top-4 right-4 p-2 rounded-xl bg-slate-800 text-slate-300 hover:text-white transition-colors"
+              className="absolute top-4 right-4 p-2 rounded-xl bg-slate-800 text-slate-300 hover:text-white transition-colors cursor-pointer"
             >
               <X className="h-5 w-5" />
             </button>

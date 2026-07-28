@@ -21,6 +21,48 @@ export default function ImagePasteInput({
   const containerRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  // Compress & resize image to prevent huge payload sizes in serverless/database
+  const readAndCompressImage = (file: File) => {
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        const MAX_WIDTH = 1200;
+        const MAX_HEIGHT = 900;
+        let width = img.width;
+        let height = img.height;
+
+        if (width > height) {
+          if (width > MAX_WIDTH) {
+            height *= MAX_WIDTH / width;
+            width = MAX_WIDTH;
+          }
+        } else {
+          if (height > MAX_HEIGHT) {
+            width *= MAX_HEIGHT / height;
+            height = MAX_HEIGHT;
+          }
+        }
+
+        canvas.width = width;
+        canvas.height = height;
+
+        const ctx = canvas.getContext('2d');
+        if (ctx) {
+          ctx.drawImage(img, 0, 0, width, height);
+          // Compress to WebP / JPEG format (~100KB-200KB)
+          const compressedBase64 = canvas.toDataURL('image/jpeg', 0.85);
+          onChange(compressedBase64);
+        } else {
+          onChange(event.target?.result as string);
+        }
+      };
+      img.src = event.target?.result as string;
+    };
+    reader.readAsDataURL(file);
+  };
+
   // Clipboard paste event handler
   useEffect(() => {
     const handlePaste = (e: ClipboardEvent) => {
@@ -33,7 +75,7 @@ export default function ImagePasteInput({
         if (items[i].type.indexOf('image') !== -1) {
           const file = items[i].getAsFile();
           if (file) {
-            readAndSetImage(file);
+            readAndCompressImage(file);
             e.preventDefault();
             break;
           }
@@ -45,20 +87,10 @@ export default function ImagePasteInput({
     return () => window.removeEventListener('paste', handlePaste);
   }, [isFocused]);
 
-  const readAndSetImage = (file: File) => {
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      if (event.target?.result) {
-        onChange(event.target.result as string);
-      }
-    };
-    reader.readAsDataURL(file);
-  };
-
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      readAndSetImage(file);
+      readAndCompressImage(file);
     }
   };
 
@@ -66,7 +98,7 @@ export default function ImagePasteInput({
     e.preventDefault();
     const file = e.dataTransfer.files?.[0];
     if (file && file.type.startsWith('image/')) {
-      readAndSetImage(file);
+      readAndCompressImage(file);
     }
   };
 
@@ -90,7 +122,7 @@ export default function ImagePasteInput({
               <button
                 type="button"
                 onClick={() => setShowModal(true)}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-800 text-slate-100 font-mono text-xs hover:bg-slate-700 transition-colors"
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-800 text-slate-100 font-mono text-xs hover:bg-slate-700 transition-colors cursor-pointer"
               >
                 <Maximize2 className="h-3.5 w-3.5" /> Full Size
               </button>
@@ -98,13 +130,15 @@ export default function ImagePasteInput({
               <button
                 type="button"
                 onClick={() => onChange('')}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-rose-900/80 text-rose-200 font-mono text-xs hover:bg-rose-800 transition-colors"
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-rose-900/80 text-rose-200 font-mono text-xs hover:bg-rose-800 transition-colors cursor-pointer"
               >
                 <X className="h-3.5 w-3.5" /> Remove
               </button>
             </div>
           </div>
-          <p className="text-[10px] font-mono text-slate-500 text-center mt-1">Chart screenshot attached</p>
+          <p className="text-[10px] font-mono text-emerald-400 font-medium text-center mt-1">
+            Chart screenshot compressed & attached
+          </p>
         </div>
       ) : (
         <div
@@ -139,7 +173,7 @@ export default function ImagePasteInput({
           </div>
 
           <p className="text-xs font-mono font-semibold text-center text-slate-200">{placeholder}</p>
-          <span className="text-[10px] font-mono text-slate-500 mt-1">Supports Ctrl+V Paste, Drag & Drop, or Click to Upload PNG/JPG</span>
+          <span className="text-[10px] font-mono text-slate-500 mt-1">Supports Ctrl+V Paste, Drag & Drop, or Click to Upload</span>
         </div>
       )}
 
@@ -150,7 +184,7 @@ export default function ImagePasteInput({
             <button
               type="button"
               onClick={() => setShowModal(false)}
-              className="absolute top-4 right-4 p-2 rounded-xl bg-slate-800 text-slate-300 hover:text-white transition-colors"
+              className="absolute top-4 right-4 p-2 rounded-xl bg-slate-800 text-slate-300 hover:text-white transition-colors cursor-pointer"
             >
               <X className="h-5 w-5" />
             </button>

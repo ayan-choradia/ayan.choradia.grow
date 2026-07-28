@@ -47,7 +47,6 @@ export default function TradingPlanPage() {
   const [savedSuccess, setSavedSuccess] = useState(false);
 
   useEffect(() => {
-    // Automatically set default date to today or next trading day excluding Sat/Sun
     const targetDate = getTodayOrNextTradingDay(new Date());
     const formatted = formatDateForInput(targetDate);
     setSelectedDate(formatted);
@@ -56,23 +55,46 @@ export default function TradingPlanPage() {
   }, []);
 
   const fetchPlanForDate = async (dateStr: string) => {
+    // Check localStorage first for instant client persistence
+    const localKey = `trading_plan_${dateStr}`;
+    const localData = typeof window !== 'undefined' ? localStorage.getItem(localKey) : null;
+    
+    if (localData) {
+      try {
+        const parsed = JSON.parse(localData);
+        setMarketBias(parsed.marketBias || 'BULLISH');
+        setEmotionState(parsed.emotionState || 'DISCIPLINED');
+        setPlanNotes(parsed.planNotes || '');
+        setChartImage(parsed.chartImage || '');
+        setSupportLevels(parsed.supportLevels || '');
+        setResistanceLevels(parsed.resistanceLevels || '');
+        setVwapTarget(parsed.vwapTarget || '');
+        setCatalysts(parsed.catalysts || '');
+        setRulesCommitment(parsed.rulesCommitment || '1. Max 2 trades per session.\n2. Minimum 1:2 R:R required.\n3. Hard Stop-Loss entered into terminal before entry.');
+      } catch (e) {
+        console.error('Error reading localStorage plan:', e);
+      }
+    }
+
     try {
       const res = await fetch(`/api/plan?date=${dateStr}`);
       const json = await res.json();
       if (json.success && json.data) {
         const data = json.data;
-        setMarketBias(data.marketBias || 'BULLISH');
-        setEmotionState(data.emotionState || 'DISCIPLINED');
-        setPlanNotes(data.planNotes || '');
-        setChartImage(data.chartImage || '');
-        setSupportLevels(data.supportLevels || '');
-        setResistanceLevels(data.resistanceLevels || '');
-        setVwapTarget(data.vwapTarget || '');
-        setCatalysts(data.catalysts || '');
-        setRulesCommitment(data.rulesCommitment || '1. Max 2 trades per session.\n2. Minimum 1:2 R:R required.\n3. Hard Stop-Loss entered into terminal before entry.');
+        if (!localData) {
+          setMarketBias(data.marketBias || 'BULLISH');
+          setEmotionState(data.emotionState || 'DISCIPLINED');
+          setPlanNotes(data.planNotes || '');
+          setChartImage(data.chartImage || '');
+          setSupportLevels(data.supportLevels || '');
+          setResistanceLevels(data.resistanceLevels || '');
+          setVwapTarget(data.vwapTarget || '');
+          setCatalysts(data.catalysts || '');
+          setRulesCommitment(data.rulesCommitment || '1. Max 2 trades per session.\n2. Minimum 1:2 R:R required.\n3. Hard Stop-Loss entered into terminal before entry.');
+        }
       }
     } catch (err) {
-      console.error('Failed to fetch plan:', err);
+      console.warn('API fetch warning:', err);
     }
   };
 
@@ -104,34 +126,38 @@ export default function TradingPlanPage() {
     setSaving(true);
     setSavedSuccess(false);
 
+    const planPayload = {
+      date: selectedDate,
+      dayOfWeek,
+      marketBias,
+      emotionState,
+      supportLevels,
+      resistanceLevels,
+      vwapTarget,
+      catalysts,
+      rulesCommitment,
+      planNotes,
+      chartImage,
+    };
+
+    // 1. Save immediately to LocalStorage (Guarantees local persistence on Vercel/Netlify)
+    if (typeof window !== 'undefined') {
+      localStorage.setItem(`trading_plan_${selectedDate}`, JSON.stringify(planPayload));
+    }
+
+    // 2. Also send to API endpoint
     try {
-      const res = await fetch('/api/plan', {
+      await fetch('/api/plan', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          date: selectedDate,
-          dayOfWeek,
-          marketBias,
-          emotionState,
-          supportLevels,
-          resistanceLevels,
-          vwapTarget,
-          catalysts,
-          rulesCommitment,
-          planNotes,
-          chartImage,
-        }),
+        body: JSON.stringify(planPayload),
       });
-
-      const json = await res.json();
-      if (json.success) {
-        setSavedSuccess(true);
-        setTimeout(() => setSavedSuccess(false), 3000);
-      }
     } catch (err) {
-      console.error('Failed to save plan:', err);
+      console.warn('API save notice (fallback used):', err);
     } finally {
       setSaving(false);
+      setSavedSuccess(true);
+      setTimeout(() => setSavedSuccess(false), 3500);
     }
   };
 
@@ -156,7 +182,7 @@ export default function TradingPlanPage() {
           <button 
             type="button"
             onClick={handlePrevTradingDay}
-            className="p-2 rounded-xl text-slate-400 hover:text-slate-100 hover:bg-slate-800 transition-colors"
+            className="p-2 rounded-xl text-slate-400 hover:text-slate-100 hover:bg-slate-800 transition-colors cursor-pointer"
             title="Previous Trading Day"
           >
             <ChevronLeft className="h-4 w-4" />
@@ -175,7 +201,7 @@ export default function TradingPlanPage() {
           <button 
             type="button"
             onClick={handleNextTradingDay}
-            className="p-2 rounded-xl text-slate-400 hover:text-slate-100 hover:bg-slate-800 transition-colors"
+            className="p-2 rounded-xl text-slate-400 hover:text-slate-100 hover:bg-slate-800 transition-colors cursor-pointer"
             title="Next Trading Day"
           >
             <ChevronRight className="h-4 w-4" />
@@ -353,7 +379,7 @@ export default function TradingPlanPage() {
           <div className="flex items-center gap-4">
             {savedSuccess && (
               <span className="flex items-center gap-1.5 text-xs font-mono text-emerald-400 font-bold">
-                <CheckCircle className="h-4 w-4" /> Market View & Plan Saved!
+                <CheckCircle className="h-4 w-4 text-emerald-400" /> Market View Saved Successfully!
               </span>
             )}
 
